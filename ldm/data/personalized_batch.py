@@ -5,6 +5,9 @@ from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms
 from pathlib import Path
+from typing import OrderedDict
+from captionizer import caption_from_path, generic_captions_from_path
+from captionizer import find_images
 
 class PersonalizedBatchBase(Dataset):
     def __init__(self,
@@ -29,7 +32,10 @@ class PersonalizedBatchBase(Dataset):
 
         for cl in classes:
             class_path = os.path.join(self.data_root, cl)
-            for file_path in os.listdir(class_path):
+            file_list = os.listdir(class_path)
+            file_list = [name for name in file_list if name[0] != "." ]
+            #exclude hide folder       ex) /.ipynb_checkpoints
+            for file_path in file_list:
                 image_path = os.path.join(class_path, file_path)
                 self.image_paths.append(image_path)
                 self.image_classes.append(cl)
@@ -41,7 +47,10 @@ class PersonalizedBatchBase(Dataset):
         for cl in classes:
             self.reg_image_paths[cl] = []
             class_path = os.path.join(self.reg_data_root, cl)
-            for file_path in os.listdir(class_path):
+            file_list = os.listdir(class_path)
+            file_list = [name for name in file_list if name[0] != "." ]
+            #exclude hide folder       ex) /.ipynb_checkpoints
+            for file_path in file_list:
                 image_path = os.path.join(class_path, file_path)
                 self.reg_image_paths[cl].append(image_path)
 

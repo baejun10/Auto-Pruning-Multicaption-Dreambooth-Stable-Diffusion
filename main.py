@@ -20,6 +20,7 @@ from pytorch_lightning.utilities import rank_zero_info
 
 from ldm.data.base import Txt2ImgIterableBaseDataset
 from ldm.util import instantiate_from_config
+from ldm.modules.pruningckptio import PruningCheckpointIO
 
 ## Un-comment this for windows
 ## os.environ["PL_TORCH_DISTRIBUTED_BACKEND"] = "gloo"
@@ -263,8 +264,11 @@ class DataModuleFromConfig(pl.LightningDataModule):
             init_fn = worker_init_fn
         else:
             init_fn = None
-        dataset = self.datasets["train"]
-        return DataLoader(dataset, batch_size=self.batch_size,
+        train_set = self.datasets["train"]
+        if 'reg' in self.datasets:
+            reg_set = self.datasets["reg"]
+            train_set = ConcatDataset(train_set, reg_set)
+        return DataLoader(train_set, batch_size=self.batch_size,
                           num_workers=self.num_workers, shuffle=False if is_iterable_dataset else True,
                           worker_init_fn=init_fn)
 
@@ -676,7 +680,7 @@ if __name__ == "__main__":
         if hasattr(model, "monitor"):
             print(f"Monitoring {model.monitor} as checkpoint metric.")
             default_modelckpt_cfg["params"]["monitor"] = model.monitor
-            default_modelckpt_cfg["params"]["save_top_k"] = 1
+            default_modelckpt_cfg["params"]["save_top_k"] = 10
 
         if "modelcheckpoint" in lightning_config:
             modelckpt_cfg = lightning_config.modelcheckpoint
@@ -754,7 +758,8 @@ if __name__ == "__main__":
 
         trainer_kwargs["callbacks"] = [instantiate_from_config(callbacks_cfg[k]) for k in callbacks_cfg]
         trainer_kwargs["max_steps"] = trainer_opt.max_steps
-
+        trainer_kwargs["plugins"] = PruningCheckpointIO()
+        
         trainer = Trainer.from_argparse_args(trainer_opt, **trainer_kwargs)
         trainer.logdir = logdir  ###
 
@@ -762,6 +767,7 @@ if __name__ == "__main__":
         config.data.params.train.params.data_root = opt.data_root
         config.data.params.train.params.reg_data_root = opt.reg_data_root
         config.data.params.validation.params.data_root = opt.data_root
+        #config.data.params.reg.params.data_root = opt.reg_data_root
         data = instantiate_from_config(config.data)
 
         data = instantiate_from_config(config.data)
